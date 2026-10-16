@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# StudyPilot AI - Local study data
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/*.sqlite3
