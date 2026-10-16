@@ -3,78 +3,76 @@ from pathlib import Path
 import re
 import pymupdf
 
-
-# Carpeta donde se guardan los documentos
-DOCUMENTS_DIR = Path("data/documents")
+CARPETA_DOCUMENTOS = Path("data/documents")
 
 
-# Crear carpeta para cada materia
 def carpeta_materia(materia):
-    nombre = re.sub(
-        r"[^a-zA-Z0-9_-]",
-        "_",
-        materia
-    )
+    nombre = re.sub(r"[^\w\s-]", "", materia, flags=re.UNICODE)
+    nombre = re.sub(r"\s+", "_", nombre.strip())
 
-    nombre = nombre.strip("_") or "materia"
+    if not nombre:
+        raise ValueError("El nombre de la materia no es válido.")
 
-    carpeta = DOCUMENTS_DIR / nombre
+    carpeta = CARPETA_DOCUMENTOS / nombre
     carpeta.mkdir(parents=True, exist_ok=True)
 
     return carpeta
 
 
-# Guardar documentos PDF
-def guardar_pdf(materia, archivo):
-    carpeta = carpeta_materia(materia)
-
-    nombre = Path(archivo.name).name
+def ruta_documento(materia, nombre_archivo):
+    nombre = Path(nombre_archivo).name
 
     if not nombre.lower().endswith(".pdf"):
-        raise ValueError("Solo se permiten archivos PDF.")
+        raise ValueError("El archivo debe ser un PDF.")
 
-    ruta = carpeta / nombre
+    return carpeta_materia(materia) / nombre
 
-    with open(ruta, "wb") as f:
-        f.write(archivo.getbuffer())
 
+def guardar_pdf(materia, archivo):
+    ruta = ruta_documento(materia, archivo.name)
+    ruta.write_bytes(archivo.getvalue())
     return ruta
 
 
-# Obtener documentos guardados
 def listar_pdfs(materia):
     carpeta = carpeta_materia(materia)
 
     return sorted(
         archivo.name
         for archivo in carpeta.glob("*.pdf")
+        if archivo.is_file()
     )
 
 
-# Leer contenido de los documentos
 def leer_pdf(materia, nombre_archivo):
-    carpeta = carpeta_materia(materia)
-    ruta = carpeta / Path(nombre_archivo).name
-
-    texto = []
+    ruta = ruta_documento(materia, nombre_archivo)
+    textos = []
 
     with pymupdf.open(ruta) as documento:
         for numero, pagina in enumerate(documento, start=1):
             contenido = pagina.get_text("text")
 
             if contenido.strip():
-                texto.append(
+                textos.append(
                     f"--- Página {numero} ---\n{contenido}"
                 )
 
-    return "\n\n".join(texto)
+    return "\n\n".join(textos)
+
+
+def contar_paginas(materia, nombre_archivo):
+    ruta = ruta_documento(materia, nombre_archivo)
+
+    with pymupdf.open(ruta) as documento:
+        return len(documento)
+
 
 def obtener_imagen_pagina(materia, nombre_archivo, numero_pagina):
-    carpeta = carpeta_materia(materia)
-    ruta = carpeta / Path(nombre_archivo).name
+    ruta = ruta_documento(materia, nombre_archivo)
 
     with pymupdf.open(ruta) as documento:
         pagina = documento[numero_pagina]
+
         imagen = pagina.get_pixmap(
             matrix=pymupdf.Matrix(1.5, 1.5),
             alpha=False
@@ -83,9 +81,34 @@ def obtener_imagen_pagina(materia, nombre_archivo, numero_pagina):
         return imagen.tobytes("png")
 
 
-def contar_paginas(materia, nombre_archivo):
-    carpeta = carpeta_materia(materia)
-    ruta = carpeta / Path(nombre_archivo).name
+def obtener_contexto(materia, limite=14000):
+    documentos = listar_pdfs(materia)
+    partes = []
 
-    with pymupdf.open(ruta) as documento:
-        return len(documento)
+    for nombre in documentos:
+        texto = leer_pdf(materia, nombre)
+
+        if texto.strip():
+            partes.append(
+                f"DOCUMENTO: {nombre}\n{texto}"
+            )
+
+    contexto = "\n\n".join(partes)
+
+    return contexto[:limite]
+
+def obtener_contexto(materia, limite=14000):
+    documentos = listar_pdfs(materia)
+    partes = []
+
+    for nombre in documentos:
+        texto = leer_pdf(materia, nombre)
+
+        if texto.strip():
+            partes.append(
+                f"DOCUMENTO: {nombre}\n{texto}"
+            )
+
+    contexto = "\n\n".join(partes)
+
+    return contexto[:limite]
