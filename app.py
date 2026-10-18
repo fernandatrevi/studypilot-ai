@@ -1,5 +1,6 @@
 import streamlit as st
 from src.database import (
+    obtener_errores_interactivos,
     inicializar_db,
     agregar_materia,
     obtener_materias,
@@ -395,6 +396,8 @@ elif opcion in [
 
 
 # REPASAR ERRORES
+
+# REPASAR ERRORES
 elif opcion == "Repasar errores":
 
     st.header("🔁 Repasar errores")
@@ -418,40 +421,91 @@ elif opcion == "Repasar errores":
         f"{estadisticas['porcentaje']}%"
     )
 
-    errores = obtener_errores(materia)
+    errores = obtener_errores_interactivos(materia)
 
-    if errores:
-
-        st.subheader("Preguntas que necesitas repasar")
-
-        for indice, error in enumerate(
-            errores,
-            start=1
-        ):
-
-            pregunta, respuesta, correcta, explicacion, fecha = error
-
-            with st.expander(
-                f"Error {indice}: {pregunta}"
-            ):
-
-                st.write(
-                    f"**Tu respuesta:** {respuesta}"
-                )
-
-                st.write(
-                    f"**Respuesta correcta:** {correcta}"
-                )
-
-                st.write(
-                    f"**Explicación:** {explicacion}"
-                )
-
-                st.caption(
-                    f"Fecha: {fecha}"
-                )
+    if not errores:
+        st.success("¡Todavía no tienes errores registrados!")
 
     else:
-        st.info(
-            "Todavía no tienes errores registrados."
-        )
+        st.subheader("Practica las preguntas que fallaste")
+
+        for error in errores:
+
+            with st.expander(error["pregunta"]):
+
+                opciones = error["opciones"]
+
+                if len(opciones) != 4:
+                    st.info(
+                        "Esta pregunta pertenece a un examen anterior "
+                        "y no tiene las cuatro opciones guardadas."
+                    )
+
+                    st.write(
+                        f"Respuesta correcta: "
+                        f"{error['respuesta_correcta']}"
+                    )
+
+                    st.write(error["explicacion"])
+                    continue
+
+                with st.form(
+                    key=f"repaso_form_{error['id']}"
+                ):
+
+                    seleccion = st.radio(
+                        "Selecciona tu respuesta:",
+                        options=opciones,
+                        index=None,
+                        key=f"repaso_{error['id']}"
+                    )
+
+                    comprobar = st.form_submit_button(
+                        "Comprobar respuesta"
+                    )
+
+                clave = f"resultado_repaso_{error['id']}"
+
+                if comprobar:
+
+                    if seleccion is None:
+                        st.warning("Selecciona una respuesta.")
+
+                    else:
+                        correcta = (
+                            seleccion == error["respuesta_correcta"]
+                        )
+
+                        st.session_state[clave] = {
+                            "correcta": correcta,
+                            "seleccion": seleccion
+                        }
+
+                resultado_repaso = st.session_state.get(clave)
+
+                if resultado_repaso:
+
+                    if resultado_repaso["correcta"]:
+                        st.success(
+                            "¡Correcto! Aprendiste de tu error."
+                        )
+
+                    else:
+                        st.error(
+                            "Respuesta incorrecta. Sigue practicando."
+                        )
+
+                    st.write(
+                        "**Tu respuesta:**",
+                        resultado_repaso["seleccion"]
+                    )
+
+                    st.write(
+                        "**Respuesta correcta:**",
+                        error["respuesta_correcta"]
+                    )
+
+                    st.write(
+                        "**Explicación:**",
+                        error["explicacion"]
+                    )

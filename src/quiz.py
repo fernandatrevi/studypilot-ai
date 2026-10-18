@@ -10,8 +10,7 @@ def generar_examen(contexto, cantidad=5):
         )
 
     mensaje = f"""
-Genera un examen universitario utilizando únicamente
-el siguiente material.
+Genera un examen universitario utilizando únicamente el siguiente material.
 
 MATERIAL:
 {contexto[:11000]}
@@ -19,21 +18,20 @@ MATERIAL:
 Crea exactamente {cantidad} preguntas de opción múltiple.
 
 Devuelve exclusivamente este JSON:
-
 {{
-  "preguntas": [
-    {{
-      "pregunta": "¿Pregunta?",
-      "opciones": [
-        "Opción A",
-        "Opción B",
-        "Opción C",
-        "Opción D"
-      ],
-      "correcta": 0,
-      "explicacion": "Justificación de la respuesta"
-    }}
-  ]
+    "preguntas": [
+        {{
+            "pregunta": "¿Pregunta?",
+            "opciones": [
+                "Opción A",
+                "Opción B",
+                "Opción C",
+                "Opción D"
+            ],
+            "correcta": 0,
+            "explicacion": "Justificación de la respuesta"
+        }}
+    ]
 }}
 
 REGLAS:
@@ -90,19 +88,22 @@ def evaluar_examen(preguntas, respuestas):
     for indice, pregunta in enumerate(preguntas):
         seleccionada = respuestas.get(indice)
         correcta = pregunta["correcta"]
+        opciones = pregunta["opciones"]
 
         es_correcta = seleccionada == correcta
 
         if es_correcta:
             aciertos += 1
 
-        opciones = pregunta["opciones"]
-
         resultados.append({
             "pregunta": pregunta["pregunta"],
+            "opciones": opciones,
             "respuesta_usuario": (
                 opciones[seleccionada]
-                if seleccionada is not None
+                if (
+                    type(seleccionada) is int
+                    and 0 <= seleccionada < len(opciones)
+                )
                 else "Sin responder"
             ),
             "respuesta_correcta": opciones[correcta],
