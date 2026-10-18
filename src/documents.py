@@ -1,4 +1,6 @@
 
+"""Gestión de PDF y selección de contexto para StudyPilot AI."""
+
 from pathlib import Path
 import re
 import pymupdf
@@ -15,7 +17,6 @@ def carpeta_materia(materia):
 
     carpeta = CARPETA_DOCUMENTOS / nombre
     carpeta.mkdir(parents=True, exist_ok=True)
-
     return carpeta
 
 
@@ -50,9 +51,9 @@ def leer_pdf(materia, nombre_archivo):
 
     with pymupdf.open(ruta) as documento:
         for numero, pagina in enumerate(documento, start=1):
-            contenido = pagina.get_text("text")
+            contenido = pagina.get_text("text").strip()
 
-            if contenido.strip():
+            if contenido:
                 textos.append(
                     f"--- Página {numero} ---\n{contenido}"
                 )
@@ -75,40 +76,125 @@ def obtener_imagen_pagina(materia, nombre_archivo, numero_pagina):
 
         imagen = pagina.get_pixmap(
             matrix=pymupdf.Matrix(1.5, 1.5),
-            alpha=False
+            alpha=False,
         )
 
         return imagen.tobytes("png")
 
 
 def obtener_contexto(materia, limite=14000):
-    documentos = listar_pdfs(materia)
-    partes = []
+    """
+    Obtiene contenido de los PDF de una materia.
 
-    for nombre in documentos:
-        texto = leer_pdf(materia, nombre)
+    Mejoras:
+    - Conserva definiciones y explicaciones breves.
+    - Evita depender únicamente de las primeras páginas.
+    - Distribuye el contenido entre los documentos disponibles.
+    - Mantiene el nombre del documento y el número de página.
+    - No inventa texto que no se pudo extraer.
 
-        if texto.strip():
-            partes.append(
-                f"DOCUMENTO: {nombre}\n{texto}"
+    Limitación:
+    - No realiza OCR sobre imágenes.
+    """
+
+    if type(limite) is not int or limite <= 0:
+        raise ValueError(
+            "El límite debe ser un entero positivo."
+        )
+
+    documentos = []
+
+    for nombre in listar_pdfs(materia):
+        ruta = ruta_documento(materia, nombre)
+        paginas = []
+
+        with pymupdf.open(ruta) as documento:
+            for numero, pagina in enumerate(documento, start=1):
+                texto = pagina.get_text("text").strip()
+
+                if not texto:
+                    continue
+
+                palabras = re.findall(
+                    r"\b\w+\b",
+                    texto,
+                    flags=re.UNICODE,
+                )
+
+                # Conservar definiciones y explicaciones cortas.
+                if len(palabras) < 8:
+                    continue
+
+                bloque = (
+                    f"DOCUMENTO: {nombre}\n"
+                    f"--- Página {numero} ---\n"
+                    f"{texto}"
+                )
+
+                paginas.append(bloque)
+
+        if paginas:
+            documentos.append(paginas)
+
+    if not documentos:
+        return ""
+
+    # Intercalar páginas de los documentos para darles
+    # oportunidad de aparecer en el contexto.
+    candidatas = []
+    indice = 0
+
+    while any(indice < len(doc) for doc in documentos):
+        for paginas in documentos:
+            if indice < len(paginas):
+                candidatas.append(paginas[indice])
+
+        indice += 1
+
+    # Distribuir el presupuesto entre páginas.
+    # Cada página conserva su encabezado y parte del texto.
+    seleccionadas = []
+    espacio_restante = limite
+
+    for posicion, bloque in enumerate(candidatas):
+        paginas_restantes = len(candidatas) - posicion
+
+        if espacio_restante <= 0:
+            break
+
+        separador = "\n\n" if seleccionadas else ""
+        disponible = espacio_restante - len(separador)
+
+        if disponible <= 0:
+            break
+
+        cuota = max(1, disponible // paginas_restantes)
+        encabezado, separacion, contenido = bloque.partition("\n")
+
+        if separacion:
+            segunda_linea, sep2, resto = contenido.partition("\n")
+
+            prefijo = (
+                encabezado + "\n" + segunda_linea + "\n"
             )
 
-    contexto = "\n\n".join(partes)
+            if len(prefijo) >= cuota:
+                # No incluir un encabezado sin contenido útil.
+                continue
 
-    return contexto[:limite]
-
-def obtener_contexto(materia, limite=14000):
-    documentos = listar_pdfs(materia)
-    partes = []
-
-    for nombre in documentos:
-        texto = leer_pdf(materia, nombre)
-
-        if texto.strip():
-            partes.append(
-                f"DOCUMENTO: {nombre}\n{texto}"
+            texto_disponible = max(
+                0,
+                min(len(resto), cuota - len(prefijo)),
             )
 
-    contexto = "\n\n".join(partes)
+            fragmento = prefijo + resto[:texto_disponible]
+        else:
+            fragmento = bloque[:cuota]
 
-    return contexto[:limite]
+        if not fragmento.strip():
+            continue
+
+        seleccionadas.append(fragmento)
+        espacio_restante -= len(separador) + len(fragmento)
+
+    return "\n\n".join(seleccionadas)
