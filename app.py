@@ -349,6 +349,7 @@ elif opcion in [
                     f"No se pudo calificar el examen: {error}"
                 )
 
+        resultado = st.session_state.get(clave_resultado)
         if resultado:
 
             st.divider()
@@ -394,8 +395,6 @@ elif opcion in [
                         f"{detalle['explicacion']}"
                     )
 
-
-# REPASAR ERRORES
 
 # REPASAR ERRORES
 elif opcion == "Repasar errores":
