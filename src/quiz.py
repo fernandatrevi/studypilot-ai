@@ -110,7 +110,7 @@ def _validar_pregunta(p, tipo, paginas):
         return None
     if not all(isinstance(o, str) and o.strip() for o in opciones):
         return None
-    if len({_normalizar(o) for o in opciones}) != 4:
+    if len({_normalizar(re.sub(r'^\\s*[A-Da-d][.)]\\s+', '', o)) for o in opciones}) != 4:
         return None
     if type(p.get('correcta')) is not int or p['correcta'] not in range(4):
         return None
