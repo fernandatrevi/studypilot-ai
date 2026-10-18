@@ -151,49 +151,23 @@ def obtener_contexto(materia, limite=14000):
 
         indice += 1
 
-    # Distribuir el presupuesto entre páginas.
-    # Cada página conserva su encabezado y parte del texto.
+    # Priorizar fragmentos legibles: evitar repartir el límite en trozos
+    # diminutos cuando hay cientos de diapositivas.
     seleccionadas = []
     espacio_restante = limite
-
-    for posicion, bloque in enumerate(candidatas):
-        paginas_restantes = len(candidatas) - posicion
-
-        if espacio_restante <= 0:
-            break
-
+    for bloque in candidatas:
         separador = "\n\n" if seleccionadas else ""
         disponible = espacio_restante - len(separador)
-
-        if disponible <= 0:
+        if disponible < 150:
             break
-
-        cuota = max(1, disponible // paginas_restantes)
-        encabezado, separacion, contenido = bloque.partition("\n")
-
-        if separacion:
-            segunda_linea, sep2, resto = contenido.partition("\n")
-
-            prefijo = (
-                encabezado + "\n" + segunda_linea + "\n"
-            )
-
-            if len(prefijo) >= cuota:
-                # No incluir un encabezado sin contenido útil.
-                continue
-
-            texto_disponible = max(
-                0,
-                min(len(resto), cuota - len(prefijo)),
-            )
-
-            fragmento = prefijo + resto[:texto_disponible]
-        else:
-            fragmento = bloque[:cuota]
-
-        if not fragmento.strip():
+        prefijo = bloque.split("\n", 2)
+        if len(prefijo) != 3:
             continue
-
+        encabezado = prefijo[0] + "\n" + prefijo[1] + "\n"
+        espacio_texto = min(1400, disponible - len(encabezado))
+        if espacio_texto < 100:
+            continue
+        fragmento = encabezado + prefijo[2][:espacio_texto]
         seleccionadas.append(fragmento)
         espacio_restante -= len(separador) + len(fragmento)
 

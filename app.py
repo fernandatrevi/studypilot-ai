@@ -137,7 +137,7 @@ if documentos:
                     st.image(
                         imagen,
                         caption=f"Página {pagina} de {total_paginas}",
-                        use_container_width=True
+                        width='stretch'
                     )
 
             except Exception as error:
