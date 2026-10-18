@@ -67,8 +67,7 @@ def _preparar_material(contexto, limite=6500):
                     'importancia', 'concepto', 'porque', 'definicion', 'explica',
                     'means', 'because', 'explains', 'difference', 'definition')
         teoria = sum(texto.count(t) for t in terminos)
-        ejercicios = sum(texto.count(t) for t in ('ejercicio', 'dataset', 'accuracy obtenido',
-                                                   'train test split', 'import pandas'))
+        ejercicios = sum(texto.count(t) for t in ('ejercicio resuelto', 'accuracy obtenido', 'train test split', 'import pandas'))
         return teoria * 3 - ejercicios
     paginas = sorted(paginas, key=puntaje, reverse=True)
     bloques = []
@@ -85,39 +84,18 @@ def _preparar_material(contexto, limite=6500):
 
 
 def _riesgo_ambiguedad(p):
-    """Detecta patrones de preguntas sin respuesta única evidente.
-
-    Es un filtro preventivo, no una prueba matemática de corrección.
-    """
+    """Descarta preguntas vagas sin una condición que haga única la respuesta."""
     enunciado = _normalizar(p.get('pregunta', ''))
-    opciones = [_normalizar(o) for o in p.get('opciones', [])]
-    if any(frase in enunciado for frase in (
-        'que modelo se recomienda', 'cual es el mejor modelo',
-        'que tecnica se recomienda', 'cual es la mejor tecnica',
-        'que tipo de balanceo se recomienda', 'cual es la ventaja principal',
-        'que algoritmo es mejor', 'que metodo es mejor',
-    )):
-        return True
-    if any('smote' in o for o in opciones) and any(
-        o == 'rus' or 'random undersampling' in o for o in opciones
-    ) and any(x in enunciado for x in ('balance', 'desbalance', 'clases')):
-        return True
-    return False
+    return any(frase in enunciado for frase in (
+        'cual es el mejor', 'cual es la mejor',
+        'que metodo es mejor', 'que tecnica se recomienda',
+        'cual es la ventaja principal',
+    ))
 
 
 def _tipo_valido(pregunta, tipo):
-    texto = _normalizar(pregunta['pregunta'])
-    vetadas = ('cual fue el accuracy', 'valor del accuracy', 'accuracy obtenido',
-               'accuracy de train', 'accuracy de test', 'cuantos registros',
-               'cuantas observaciones', 'en el ejercicio', 'en la pagina',
-               'segun la pagina', 'que tipo de overfitting se observa',
-               'en el dataset', 'en la actividad', 'en el conjunto de entrenamiento')
-    if any(frase in texto for frase in vetadas):
-        return False
-    if tipo == 'conceptual' and any(t in texto for t in
-                                    ('celular', 'pima', 'paciente', 'dataset', 'diabetes')):
-        return False
-    return True
+    """No bloquea materias, nombres de datasets ni disciplinas específicas."""
+    return tipo in ('conceptual', 'aplicacion')
 
 
 def _validar_pregunta(p, tipo, paginas):
@@ -164,6 +142,8 @@ def _validar_pregunta(p, tipo, paginas):
                     if not fuente or _normalizar(fuente) == _normalizar(etiqueta):
                         pagina_verificada = etiqueta
                         break
+    if not pagina_verificada:
+        return None
     nueva = dict(p)
     nueva['correctas'] = [p['correcta']]
     nueva['ambigua'] = False
@@ -185,55 +165,15 @@ def _validar_pregunta(p, tipo, paginas):
     return nueva
 
 
-def _preguntas_respaldo_xai(contexto):
-    """Banco editorial complementario: no atribuir al PDF sin cita literal."""
-    temas = _normalizar(contexto)
-    if not any(t in temas for t in ('shap', 'lime', 'explainable', 'explicabilidad', 'interpretabilidad')):
-        return []
-    datos = [
-        ('conceptual', '¿Qué diferencia una explicación local de una global?',
-         ['La local explica una predicción; la global resume el modelo.', 'La local solo funciona en regresión.', 'La global explica exclusivamente un registro.', 'Ambas muestran siempre los mismos resultados.'], 0,
-         'La explicación local analiza una observación; la global describe patrones generales del modelo.'),
-        ('conceptual', '¿Qué representa un valor SHAP positivo para una clase concreta?',
-         ['Una contribución que aumenta la salida de esa clase.', 'La certeza de que la predicción es correcta.', 'El porcentaje de datos de entrenamiento.', 'Una reducción obligatoria de la salida de esa clase.'], 0,
-         'Un valor SHAP positivo empuja hacia arriba la salida explicada, respecto al valor de referencia.'),
-        ('conceptual', '¿Por qué una variable importante globalmente puede ser poco relevante para un caso?',
-         ['Su contribución cambia entre observaciones.', 'Todas las variables influyen igual en cada caso.', 'La importancia global es siempre un error.', 'Las explicaciones locales ignoran los datos.'], 0,
-         'La importancia global resume muchas observaciones, pero la contribución de cada variable puede variar en un caso particular.'),
-        ('conceptual', '¿Qué precaución requiere interpretar una explicación de un modelo predictivo?',
-         ['Una contribución predictiva no demuestra causalidad.', 'Toda correlación prueba una relación causal.', 'Las explicaciones eliminan cualquier sesgo.', 'Un valor alto garantiza que el modelo es correcto.'], 0,
-         'Las explicaciones describen cómo el modelo usa variables; por sí solas no establecen relaciones de causa y efecto.'),
-        ('aplicacion', 'Si un equipo necesita explicar por qué cambió una predicción individual, ¿qué análisis corresponde?',
-         ['Una explicación local de esa observación.', 'Solo la exactitud promedio del conjunto.', 'El número total de filas disponibles.', 'Únicamente la distribución de clases.'], 0,
-         'Una explicación local permite examinar qué variables contribuyeron a una predicción concreta.'),
-        ('aplicacion', 'En un escenario hipotético, dos pacientes reciben predicciones diferentes. ¿Qué comparación ayuda a interpretarlas?',
-         ['Comparar contribuciones locales de las variables.', 'Comparar solamente el tamaño del archivo.', 'Revisar únicamente el promedio de edades.', 'Eliminar todas las variables del modelo.'], 0,
-         'Comparar contribuciones locales muestra qué características influyeron en cada predicción, sin asumir causalidad.'),
-        ('aplicacion', 'Si un equipo quiere resumir qué variables influyen en muchas predicciones, ¿qué necesita?',
-         ['Un análisis de importancia global.', 'Una sola predicción sin contexto.', 'Eliminar el conjunto de prueba.', 'La etiqueta de un único registro.'], 0,
-         'La importancia global resume patrones de contribución de variables a través de múltiples observaciones.'),
-    ]
-    preguntas = []
-    for tipo, enunciado, opciones, correcta, explicacion in datos:
-        candidata = {'tipo': tipo, 'pregunta': enunciado, 'opciones': opciones,
-                     'correcta': correcta, 'correctas': [correcta], 'ambigua': False,
-                     'explicacion': explicacion, 'fuente': 'IA', 'evidencia': '',
-                     'por_que_no': ['', '', '', '']}
-        validada = _validar_pregunta(candidata, tipo, [])
-        if validada:
-            validada['fuente'] = 'Banco de estudio complementario (no cita del PDF)'
-            validada['origen'] = 'complementario'
-            preguntas.append(validada)
-    return preguntas
-
-
 def generar_examen(contexto, cantidad=5):
     if not isinstance(contexto, str) or not contexto.strip():
         raise ValueError('No hay texto disponible para generar el examen.')
     if type(cantidad) is not int or not 1 <= cantidad <= 30:
         raise ValueError('La cantidad debe estar entre 1 y 30.')
 
-    material, paginas = _preparar_material(contexto, limite=2400)
+    material, paginas = _preparar_material(contexto, limite=6500)
+    if len(material.strip()) < 150:
+        raise ValueError('El PDF contiene muy poco texto seleccionable para generar preguntas.')
     aplicaciones = round(cantidad * 0.2)
     metas = {'conceptual': cantidad - aplicaciones, 'aplicacion': aplicaciones}
     resultados = {'conceptual': [], 'aplicacion': []}
@@ -251,66 +191,39 @@ def generar_examen(contexto, cantidad=5):
         if intento >= 2:
             faltan['aplicacion'] = min(2, faltan['aplicacion'] + 1)
         ya_usadas = '\n'.join('- ' + p['pregunta'] for grupo in resultados.values() for p in grupo) or 'Ninguna'
-        mensaje = f'''Genera preguntas de opción múltiple EXCLUSIVAMENTE sobre los temas identificados en el MATERIAL PDF.
-NECESITO EXACTAMENTE {faltan['conceptual']} preguntas con tipo "conceptual" y
-{faltan['aplicacion']} con tipo "aplicacion". Genera las preguntas que faltan
-EN UNA SOLA RESPUESTA. Nivel universitario, español claro.
-En intentos de rescate, genera casos con una condición precisa y una única solución.
-Ejemplo de tema: si la prioridad es explicar una predicción individual, pregunta
-qué método ofrece explicación local (LIME), con alternativas que no cumplan esa función.
-NO REPITAS ESTAS PREGUNTAS YA ACEPTADAS:
+        mensaje = f'''Crea preguntas universitarias de opción múltiple sobre el MATERIAL.
+Detecta la materia por el texto: puede ser historia, biología, matemáticas,
+literatura, programación o cualquier otra. No presupongas una disciplina.
+Solicito {faltan['conceptual']} preguntas conceptuales y
+{faltan['aplicacion']} preguntas de aplicación hipotética.
+Si no hay suficiente información, devuelve menos preguntas; nunca inventes.
+Cada pregunta debe tener cuatro opciones distintas y exactamente una correcta.
+La respuesta debe estar apoyada por una frase LITERAL del material.
+Copia al menos cinco palabras consecutivas de esa frase en "evidencia" y
+copia exactamente la etiqueta FUENTE de su página en "fuente".
+No inventes fuentes, datos, citas, definiciones ni resultados.
+Evita preguntas ambiguas y distractores que también sean correctos.
+En "por_que_no" explica brevemente por qué las otras opciones son incorrectas.
+No repitas estas preguntas:
 {ya_usadas}
 
-PRIORIDAD 1: utiliza la teoría del MATERIAL PDF proporcionado.
-PRIORIDAD 2: cuando el material solo muestre ejercicios, títulos o código,
-completa únicamente con teoría general de los mismos conceptos presentes
-en el material. No introduzcas temas diferentes ni inventes resultados.
-No generes preguntas cuya respuesta dependa de información no proporcionada.
-Evita afirmaciones absolutas como "garantiza", "siempre" o "el mejor".
-No preguntes cómo mejorar accuracy sin especificar el problema concreto.
-No inventes definiciones de métricas como SHAP, G-Mean, AUC o F1-score.
-
-CONCEPTUAL: exactamente preguntas de comprensión, comparación,
-interpretación, causas, límites y cuándo utilizar un método. Evita
-preguntas triviales o memorísticas y NO menciones datasets específicos.
-APLICACION: caso HIPOTÉTICO breve que obligue a elegir una acción
-justificada; no cifras ni resultados de ejercicios. Empieza el enunciado
-con «En un escenario hipotético...» o «Si un equipo...».
-No preguntes por accuracy obtenido, variable objetivo de un dataset,
-ni qué pasó con un entrenamiento que no aparece resuelto.
-Cada pregunta tiene 4 opciones DISTINTAS y UNA sola correcta.
-PROHIBIDO preguntar «cuál es el mejor modelo», «qué técnica se recomienda»
-o «ventaja principal» sin condiciones que hagan única la respuesta.
-PROHIBIDO poner SMOTE y RUS como opciones para «qué balancea clases».
-Los distractores deben ser claramente falsos EN EL CONTEXTO del enunciado.
-Incluye «por_que_no»: arreglo de 4 explicaciones breves (máximo 12 palabras
-cada una). En la posición correcta escribe cadena vacía; en las otras,
-explica por qué no corresponden. Revisa internamente que no haya dos válidas.
-Explica brevemente (máximo 22 palabras) por qué la opción correcta es correcta.
-Cada opción tendrá máximo 12 palabras y cada pregunta máximo 22 palabras.
-
-Si una pregunta está RESPALDADA DIRECTAMENTE por texto del PDF, pon
-"fuente" igual a la etiqueta FUENTE de la página y "evidencia" como
-una frase LITERAL de esa misma página que respalde la respuesta.
-Si necesitas conocimiento complementario, pon "fuente":"IA" y
-"evidencia":"". No fabriques citas. No mezcles ejercicios distintos.
-
-Devuelve SOLO un JSON con esta forma:
+Devuelve exclusivamente JSON válido:
 {{"preguntas":[{{"tipo":"conceptual","pregunta":"...",
 "opciones":["...","...","...","..."],"correcta":0,
 "correctas":[0],"ambigua":false,"explicacion":"...",
-"fuente":"IA","evidencia":"",
-"por_que_no":["","razón breve","razón breve","razón breve"]}}]}}
+"fuente":"etiqueta FUENTE","evidencia":"cita literal de 5 palabras o más",
+"por_que_no":["","razón","razón","razón"]}}]}}
 
-MATERIAL PDF (referencia temática):
+MATERIAL:
 {material}
 '''
         try:
             respuesta = consultar_ollama(
                 mensaje,
-                sistema='Eres profesor universitario de analítica predictiva. '
-                        'Prioriza el material. No inventes citas. Devuelve JSON válido.',
-                formato='json', timeout=65, num_predict=1250, num_ctx=3072,
+                sistema=('Eres docente universitario de cualquier materia. '
+                         'Solo formula preguntas respaldadas por el material. '
+                         'No inventes citas. Devuelve JSON válido.'),
+                formato='json', timeout=90, num_predict=1450, num_ctx=4096,
             )
             candidatas = _parsear_json(respuesta)
         except (ValueError, TypeError, RuntimeError) as exc:
@@ -336,16 +249,6 @@ MATERIAL PDF (referencia temática):
             resultados[tipo].append(pregunta)
 
     preguntas = resultados['conceptual'] + resultados['aplicacion']
-    # Si Ollama no completó el examen, utilizar preguntas editoriales verificadas
-    # sobre XAI, claramente etiquetadas como material complementario.
-    if len(preguntas) < cantidad:
-        for adicional in _preguntas_respaldo_xai(contexto):
-            if len(preguntas) >= cantidad:
-                break
-            clave = _normalizar(adicional['pregunta'])
-            if clave not in vistas:
-                preguntas.append(adicional)
-                vistas.add(clave)
     if len(preguntas) != cantidad:
         raise ValueError(
             f'Se generaron {len(preguntas)} de {cantidad} preguntas válidas. '
@@ -355,7 +258,8 @@ MATERIAL PDF (referencia temática):
     import random
 
     for pregunta in preguntas:
-        opciones_originales = pregunta['opciones']
+        opciones_originales = [re.sub(r'^\\s*[A-Da-d][.)]\\s+', '', o).strip()
+                              for o in pregunta['opciones']]
         correcta_original = pregunta['correcta']
         justificaciones = pregunta.get('por_que_no', [])
 
