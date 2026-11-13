@@ -2,7 +2,7 @@
 
 **Python · Streamlit · PDF Study Materials · Local AI Tutoring**
 
-**[View the GitHub repository](https://github.com/fernandatrevi/studypilot-ai)**
+**[Open the Streamlit web app](https://studypilotai.streamlit.app/)** · [View the GitHub repository](https://github.com/fernandatrevi/studypilot-ai)
 
 StudyPilot AI is an educational Streamlit app for organizing subjects, working with uploaded PDF study materials, asking a local AI tutor questions, practicing quizzes, simulating exams and reviewing mistakes.
 
@@ -22,7 +22,7 @@ StudyPilot AI is an educational Streamlit app for organizing subjects, working w
 - **Local AI service:** Ollama, with a `qwen3:1.7b` model configured in `src/tutor.py`
 - **Application modules:** `src/database.py`, `src/documents.py`, `src/quiz.py`, `src/tutor.py`
 
-This is **not a hosted public AI service**. The tutor currently expects an Ollama server running locally at `http://localhost:11434/api/chat`, with the configured model available. The user interface and internal tutor prompts currently contain Spanish text.
+A **public Streamlit interface** has been deployed at [studypilotai.streamlit.app](https://studypilotai.streamlit.app/). However, this does **not** confirm that AI tutoring works in the hosted environment: the tutor currently expects an Ollama server running locally at `http://localhost:11434/api/chat`, with the configured model available. Cloud-hosted Streamlit cannot access the user's local Ollama server at this address. The user interface and internal tutor prompts currently contain Spanish text.
 
 ## Local setup
 
@@ -37,4 +37,4 @@ For AI tutoring and quiz generation, configure and start the local Ollama servic
 
 The application is a learning prototype. AI-generated explanations and quiz questions can contain errors and should be checked against course materials. Do not upload sensitive or confidential PDFs without reviewing the application's data storage and processing behavior.
 
-**Public demo URL:** Not verified or documented. This repository is the project link.
+**Public demo URL:** [https://studypilotai.streamlit.app/](https://studypilotai.streamlit.app/) (supplied by the project owner and shown in Streamlit Community Cloud). Loading and individual feature functionality have not been independently verified; in particular, the local Ollama-backed AI features should not be presented as functional in the cloud without a separate hosted backend.
