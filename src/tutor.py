@@ -1,8 +1,11 @@
 import json
+import os
 import socket
 from urllib import request, error
 
-OLLAMA_URL = 'http://localhost:11434/api/chat'
+OLLAMA_URL = os.environ.get('STUDYPILOT_OLLAMA_URL', 'http://localhost:11434/api/chat').strip()
+if not OLLAMA_URL:
+    OLLAMA_URL = 'http://localhost:11434/api/chat'
 MODELO = 'qwen3:1.7b'
 
 
@@ -35,7 +38,13 @@ def consultar_ollama(mensaje, sistema=None, formato=None, timeout=75,
     except error.URLError as exc:
         if isinstance(exc.reason, (socket.timeout, TimeoutError)):
             raise RuntimeError(f'Ollama tardó más de {timeout} segundos.') from exc
-        raise RuntimeError('No se pudo conectar con Ollama. Verifica que esté funcionando.') from exc
+        raise RuntimeError(
+            'No se pudo conectar con el servicio de IA. En Streamlit Cloud, '
+            'localhost se refiere al servidor remoto, no a tu computadora. '
+            'Para habilitar la tutoría, configura STUDYPILOT_OLLAMA_URL '
+            'con una API accesible desde el despliegue y protegida; '
+            'si utilizas Ollama local, ejecútalo en tu equipo.'
+        ) from exc
     try:
         return resultado['message']['content']
     except (KeyError, TypeError) as exc:
