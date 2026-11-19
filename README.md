@@ -38,3 +38,7 @@ For AI tutoring and quiz generation, configure and start the local Ollama servic
 The application is a learning prototype. AI-generated explanations and quiz questions can contain errors and should be checked against course materials. Do not upload sensitive or confidential PDFs without reviewing the application's data storage and processing behavior.
 
 **Public demo URL:** [https://studypilotai.streamlit.app/](https://studypilotai.streamlit.app/) (supplied by the project owner and shown in Streamlit Community Cloud). Loading and individual feature functionality have not been independently verified; in particular, the local Ollama-backed AI features should not be presented as functional in the cloud without a separate hosted backend.
+
+## Additional project documentation
+
+- [Quality and deployment checks](docs/quality-and-deployment.md) — verification steps, limitations, and responsible-use considerations.
